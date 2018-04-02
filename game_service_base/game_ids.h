@@ -1,0 +1,20 @@
+#pragma once
+
+enum {
+	WEB_NIUNIU = 6,
+	IPHONE_NIUINIU = 12,
+	IPHONE_FINSHING = 13,
+	IPHONE_TIGERMC = 12,
+	WEB_ZHAJINGHUA,
+	FRUIT = 11,
+	BEAUTY_BEAST,
+	FOURBOOK = 17,
+	HORSE = 19,
+	GAME = 15,		//运动会
+	MOTORS = 18,	//车行
+	DRAGON,			//九转神龙
+	WHEEL = 22,		//大转盘
+	DDZ = 16,		//斗地主
+	GMAE_ID_HDDMX = 29,
+	GAME_ID_WEIQI = 14, 
+};
