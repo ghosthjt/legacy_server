@@ -31,6 +31,7 @@
 #include "transactions.cpp"
 #include "transaction_controller.cpp"
 #include "function_time_counter.h"
+#include "net_socket_basic.cpp"
 
 #pragma auto_inline (off)
 #pragma comment(lib, "dbghelp.lib")
