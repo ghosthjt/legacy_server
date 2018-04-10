@@ -6,8 +6,4 @@
 	<accdb_pwd_>123456</accdb_pwd_>
 	<accdb_name_>account_server</accdb_name_>
 	<client_port_>9999</client_port_>
-	<sync_local_port_>8000</sync_local_port_>
-	<sync_remote_ip_>127.0.0.1</sync_remote_ip_>
-	<sync_remote_port_>8001</sync_remote_port_>
-	<is_slave_>0</is_slave_>
 </config>
