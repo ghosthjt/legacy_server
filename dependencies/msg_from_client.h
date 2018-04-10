@@ -6,16 +6,16 @@ template<class remote_t>
 class msg_from_client : public msg_base<remote_t>
 {
 public:
-	unsigned char    sign_[32];
+	unsigned char    sign_[64];
 	msg_from_client()
 	{
-		memset(sign_, 0, 32);
+		memset(sign_, 0, 64);
 	}
 
 	int				read(boost::property_tree::ptree& jsval) 
 	{
 		msg_base::read(jsval);
-		json_msg_helper::read_arr_value("sign_", (char*)sign_, 32, jsval);
+		json_msg_helper::read_arr_value("sign_", (char*)sign_, 64, jsval);
 		return 0;
 	}
 
