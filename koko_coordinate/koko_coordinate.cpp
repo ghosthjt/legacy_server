@@ -2113,8 +2113,6 @@ int run()
 			the_net->ios_.poll();
 		}
 
-		
-	
 		performance_counter[1] = (boost::posix_time::microsec_clock::local_time() - p1).total_milliseconds();
 		{
 			function_time_counter ftc("the_internal_net->poll()", 20);
