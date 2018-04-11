@@ -14,25 +14,29 @@ enum
 	error_account_exist,			//注册账户名已存在
 	error_server_busy,				//服务器正忙
 	error_cant_find_player,		//找不到玩家
-	error_cant_find_match,
-	error_cant_find_server,
-	error_msg_ignored,
-	error_cancel_timer,
-	error_cannt_regist_more,  //不能再注册了
-	error_email_inusing,
-	error_mobile_inusing,
-	error_wrong_verify_code,
-	error_time_expired,
-	error_invalid_data,
+	error_cant_find_match,		//找不到比赛项目
+	error_cant_find_server,		//找不到服务器
+	error_msg_ignored,			//消息被忽略
+	error_cancel_timer,			//定时器被取消
+	error_cannt_regist_more,	//不能再注册了
+	error_email_inusing,		//邮箱地址被使用
+	error_mobile_inusing,		//手机号被使用
+	error_wrong_verify_code,	//验证码错误
+	error_time_expired,			//过期了
+	error_invalid_data,			//数据不合法
 	error_acc_name_invalid,		//用户名不合法
-	error_cant_find_room,
-	error_success = 0,
-	error_business_handled = 1,
-	error_invalid_request,
-	error_not_enough_gold,
-	error_not_enough_gold_game,
-	error_not_enough_gold_free,
-	error_cant_find_coordinate = 6,
+	error_cant_find_room,		//找不到房间
+
+	
+	error_success = 0,			//请求处理成功
+	error_business_handled = 1,	//请求被处理
+	
+	
+	error_invalid_request,		//请求非法
+	error_not_enough_gold,		//金币不足
+	error_not_enough_gold_game,	//游戏币不足
+	error_not_enough_gold_free,	
+	error_cant_find_coordinate = 6,	//找不到协同服务器
 	error_no_173_account = 7,
 	error_no_173_pretty,
 	error_cannot_send_present,	//不能发送礼物
