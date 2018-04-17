@@ -390,20 +390,25 @@ struct main_table : public table
 		sql += " = '" + key + "'";
 
 		auto fn = [vf, this, key, qr](bool result, const std::vector<result_set_ptr>& vp) {
-			if (!result || vp.empty()){	return;}
-			query_result_reader q(vp[0]);
-			if (q.fetch_row()) {
-				table_row tr;
-				for (int i = 0; i < vf.size(); i++)
-				{
-					if (vf[i].data_type == 0) {
-						replace_map_v(tr.key_value, std::make_pair(vf[i].name_, variant(q.getbigint())));
+			if (!vp.empty()) {
+				query_result_reader q(vp[0]);
+				if (q.fetch_row()) {
+					table_row tr;
+					for (int i = 0; i < vf.size(); i++)
+					{
+						if (vf[i].data_type == 0) {
+							replace_map_v(tr.key_value, std::make_pair(vf[i].name_, variant(q.getbigint())));
+						}
+						else {
+							replace_map_v(tr.key_value, std::make_pair(vf[i].name_, variant(q.getstr())));
+						}
 					}
-					else {
-						replace_map_v(tr.key_value, std::make_pair(vf[i].name_, variant(q.getstr())));
-					}
+					insert_row(*this, key, tr);
 				}
-				insert_row(*this, key, tr);
+				else {
+					table_row tr;
+					insert_row(*this, key, tr);
+				}
 			}
 			else {
 				table_row tr;
