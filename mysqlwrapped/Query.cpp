@@ -107,7 +107,8 @@ bool Query::execute(const std::string& sql)
 	m_last_query = sql;
 	if (odb ){
 		odb->last_sql_ = sql;
-		if (mysql_query(&odb->mysql, sql.c_str()) != 0){
+		int ret = mysql_query(&odb->mysql, sql.c_str());
+		if (ret != 0 && ret != 1){
 			i_log_system::get_instance()->write_log(loglv_error, "SQL EXECUTE ERR: %s \r\n, SQL = %s",
 				GetError().c_str(),
 				sql.c_str());
