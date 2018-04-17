@@ -28,8 +28,8 @@ bool db_delay_helper::pop_and_execute()
 
 		if (db_cnn && !dt.sql_content_.empty()) {
 			int ret = mysql_query(&db_cnn->mysql, dt.sql_content_.c_str());
-			if (ret != 0) {
-				i_log_system::get_instance()->write_log(loglv_error, "sql execute err : %s \r\n, SQL = %s",
+			if (ret != 0 && ret != 1) {
+ 				i_log_system::get_instance()->write_log(loglv_error, "sql execute err : %s \r\n, SQL = %s",
 					mysql_error(&db_cnn->mysql),
 					dt.sql_content_.c_str());
 			}
