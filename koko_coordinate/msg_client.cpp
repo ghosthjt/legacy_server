@@ -718,7 +718,7 @@ void msg_koko_trade_inout::handle_this2()
 	//如果订单处理过
 	if (it != handled_trade.end()) {
 		//如果状态未确定,则查询数据库状态
-		int state = it->second;
+		__int64 state = it->second;
 		if (state < 0) {
 			do_trade(&msg, handled_trade);
 		}
@@ -819,6 +819,17 @@ void msg_koko_trade_inout::do_trade(msg_koko_trade_inout_ret* pmsg, std::map<std
 		}
 		pmsg->result_ = ret;
 	}
+
+	i_log_system::get_instance()->write_log(loglv_debug,
+		"msg_koko_trade_inout complete. [gameins = %s] dir = %d, uid = %s, sn = %s, count = %lld, retcode = %d, count = %lld",
+		from_sock_->instance_.c_str(),
+		dir_,
+		uid_.c_str(),
+		sn_.c_str(),
+		count_,
+		pmsg->result_,
+		pmsg->count_);
+
 	send_protocol(from_sock_, *pmsg);
 }
 
