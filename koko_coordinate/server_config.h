@@ -95,3 +95,43 @@ public:
 		return 0;
 	}
 };
+
+enum
+{
+	phase_init = 0,
+	phase_prepare,		//准备事务
+	phase_precommit,	//预提交事务
+	phase_docommit,		//提交事务
+};
+
+struct trade_inout_orders
+{
+	std::string sn_;
+	int		phase_;
+	time_counter tc_;
+	int		trade_state_;		//0数据库查询中,1查询完成 2,成功,3失败
+	__int64	value_;
+
+	boost::shared_ptr<msg_koko_trade_inout> msg;
+
+	trade_inout_orders()
+	{
+		tc_.restart();
+		phase_ = phase_init;
+		trade_state_ = 0;
+		value_ = 0;
+	}
+
+	void	time_out()
+	{
+		rollback();
+	}
+
+	void	commit();
+	void	rollback()
+	{
+		trade_state_ = 3;
+	}
+
+	void	do_rollback();
+};

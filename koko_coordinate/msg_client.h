@@ -139,11 +139,12 @@ public:
 	int			handle_this();
 };
 
-class msg_koko_trade_inout_ret;
+class		msg_koko_trade_inout_ret;
 class		msg_koko_trade_inout : public msg_base<srv_socket_ptr>
 {
 public:
 	std::string		uid_;
+	int				phase_;
 	int				dir_;				//低位2字节 0 从平台兑入游戏部分货币， 1 从平台兑入游戏所有货币,  2 从游戏兑入平台, 高位2字节为货币ID
 	__int64			count_;				//货币量
 	__int64			time_stamp_;		//时间戳
@@ -160,6 +161,7 @@ public:
 	{
 		msg_base::read(data_s);
 		read_jvalue(uid_, data_s);
+		read_jvalue(phase_, data_s);
 		read_jvalue(dir_, data_s);
 		read_jvalue(count_, data_s);
 		read_jvalue(time_stamp_, data_s);
@@ -169,8 +171,7 @@ public:
 	}
 
 	int		handle_this();
-	void	handle_this2();
-	void	do_trade(msg_koko_trade_inout_ret* pmsg, std::map<std::string, __int64>& handled_trade);
+	void	do_trade();
 };
 
 class		msg_action_record : public msg_from_client<koko_socket_ptr>

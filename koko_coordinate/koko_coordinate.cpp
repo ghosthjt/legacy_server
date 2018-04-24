@@ -32,6 +32,7 @@
 #include "transaction_controller.cpp"
 #include "function_time_counter.h"
 #include "net_socket_basic.cpp"
+#include "server_config.h"
 
 #pragma auto_inline (off)
 #pragma comment(lib, "dbghelp.lib")
@@ -78,8 +79,7 @@ safe_list<vmsg_ptr>		sub_thread_process_vmsg_lst_;
 
 safe_list<smsg_ptr>		broadcast_msg_;
 
-safe_list<boost::shared_ptr<msg_koko_trade_inout>>		glb_trades;
-safe_list<std::pair<boost::shared_ptr<msg_koko_trade_inout_ret>, srv_socket_ptr>>	glb_trades_ret;
+std::unordered_map<std::string, boost::shared_ptr<trade_inout_orders>> glb_trades;
 
 service_config the_config;
 typedef boost::shared_ptr<host_info> hosti_ptr;
@@ -579,7 +579,7 @@ int send_mail(user_mail& mail, bool is_main_thread/*是否是主线程调用*/ = true, b
 		SET_FIELD_VALUE("hyperlink", mail.hyperlink_);
 		SET_FIELD_VALUE("state", mail.state_);
 		SET_FIELD_VALUE("attach_state", mail.attach_state_);
-		for (int i = 0; i < att.size(); i++)
+		for (int i = 0; i < (int)att.size(); i++)
 		{
 			std::string attach_id = "attach" + lx2s(i + 1) + "_id";
 			std::string attach_num = "attach" + lx2s(i + 1) + "_num";
@@ -1971,13 +1971,6 @@ int		do_run_dbthread()
 		function_time_counter ftc("db_thread_func", 500);
 		busy = db_thread_func();
 
-		boost::shared_ptr<msg_koko_trade_inout> pmsg;
-		while (glb_trades.pop_front(pmsg))
-		{
-			busy = true;
-			pmsg->handle_this2();
-		}
-
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
 	}
 	return 0;
@@ -2161,10 +2154,43 @@ int run()
 
 		performance_counter[8] = (boost::posix_time::microsec_clock::local_time() - p1).total_milliseconds();
 
-		std::pair<boost::shared_ptr<msg_koko_trade_inout_ret>, srv_socket_ptr> it_trade;
-		while (glb_trades_ret.pop_front(it_trade))
+		auto it = glb_trades.begin();
+		while (it != glb_trades.end())
 		{
-			send_protocol(it_trade.second, *it_trade.first);
+			if (it->second->tc_.elapse() > 2000 &&
+				it->second->trade_state_ != 0){
+				it->second->time_out();
+			}
+			//失败了
+			if (it->second->trade_state_ == 3){
+				auto porder = it->second;
+				i_log_system::get_instance()->write_log(loglv_debug,
+					"msg_koko_trade_inout failed. dir = %d, uid = %s, sn = %s, count = %lld, ret = %lld",
+					porder->msg->dir_,
+					porder->msg->uid_.c_str(),
+					porder->msg->sn_.c_str(),
+					porder->msg->count_,
+					porder->value_);
+
+				porder->do_rollback();
+				it = glb_trades.erase(it);
+			}
+			//成功了
+			else if (it->second->trade_state_ == 2)	{
+				auto porder = it->second;
+				i_log_system::get_instance()->write_log(loglv_debug,
+					"msg_koko_trade_inout complete. dir = %d, uid = %s, sn = %s, count = %lld, ret = %lld",
+					porder->msg->dir_,
+					porder->msg->uid_.c_str(),
+					porder->msg->sn_.c_str(),
+					porder->msg->count_,
+					porder->value_);
+
+				it = glb_trades.erase(it);
+			}
+			else {
+				it++;
+			}
 		}
 
 		{

@@ -245,9 +245,9 @@ enum
 
 enum 
 {
-	item_id_gold = 0,				//K币	
-	item_id_gold_game = 1,			//K豆
-	item_id_gold_free = 2,			//K券
+	item_id_gold = 0,				//钻石
+	item_id_gold_game = 1,			//金币
+	item_id_gold_free = 2,			//话费券
 	item_id_gold_game_lock = 3,		//已兑入游戏的货币量
 	item_id_gold_bank = 4,			//保险箱K币
 	item_id_gold_game_bank = 5,		//保险箱K豆

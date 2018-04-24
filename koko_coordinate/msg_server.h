@@ -182,18 +182,23 @@ class msg_koko_trade_inout_ret : public msg_base<none_socket>
 {
 public:
 	std::string		sn_;
+	int				phase_;
 	int				result_;				//0 处理成功, 1 已处理过				
 	__int64			count_;
 
 	msg_koko_trade_inout_ret()
 	{
 		head_.cmd_ = GET_CLSID(msg_koko_trade_inout_ret);
+		count_ = 0;
+		phase_ = -1;
+		result_ = -1;
 	}
 
 	int			write(boost::property_tree::ptree& data_s)
 	{
 		msg_base::write(data_s);
 		write_jvalue(sn_, data_s);
+		write_jvalue(phase_, data_s);
 		write_jvalue(result_, data_s);
 		write_jvalue(count_, data_s);
 		return 0;

@@ -110,11 +110,9 @@
     <ClCompile Include="msg_client.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\koko_center\error.h" />
     <ClInclude Include="..\..\koko_center\koko_center\koko_socket.h" />
     <ClInclude Include="..\..\koko_center\koko_center\player.h" />
     <ClInclude Include="..\..\mysqlwrapped\enum_t.h" />
-    <ClInclude Include="..\..\mysqlwrapped\IError.h" />
     <ClInclude Include="..\..\mysqlwrapped\set_t.h" />
     <ClInclude Include="..\..\mysqlwrapped\StderrLog.h" />
     <ClInclude Include="..\..\mysqlwrapped\SysLog.h" />

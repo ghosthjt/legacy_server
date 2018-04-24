@@ -20,6 +20,7 @@
 #include "i_transaction.h"
 #include "transaction_controller.h"
 #include "transactions.h"
+#include "server_config.h"
 
 extern db_delay_helper	db_delay_helper_;
 const int private_room_id_start = 10000000;
@@ -636,11 +637,14 @@ int msg_register_to_world::handle_this()
 	}
 }
 
+extern std::unordered_map<std::string, boost::shared_ptr<trade_inout_orders>> glb_trades;
 int msg_koko_trade_inout::handle_this()
 {
-	i_log_system::get_instance()->write_log(loglv_debug, "msg_koko_trade_inout begin. [gameins = %s] dir = %d, uid = %s, sn = %s, count = %lld",
+	i_log_system::get_instance()->write_log(loglv_debug,
+		"msg_koko_trade_inout begin. [gameins = %s] dir = %d, phase = %d, uid = %s, sn = %s, count = %lld",
 		from_sock_->instance_.c_str(),
 		dir_, 
+		phase_,
 		uid_.c_str(),
 		sn_.c_str(),
 		count_);
@@ -661,11 +665,6 @@ int msg_koko_trade_inout::handle_this()
 	game_name_ = gbk(game_name);
 	game_id_ = gameid;
 
-	msg_koko_trade_inout_ret msg;
-	msg.count_ = 0;
-	msg.result_ = error_success;
-	msg.sn_ = sn_;
-
 	std::string pat = uid_;
 	pat += boost::lexical_cast<std::string>(dir_);
 	pat += boost::lexical_cast<std::string>(count_);
@@ -674,17 +673,18 @@ int msg_koko_trade_inout::handle_this()
 	pat += the_config.token_verify_key_;
 	std::string si = md5_hash(pat);
 
+	msg_koko_trade_inout_ret msg;
+	msg.count_ = 0;
+	msg.result_ = error_success;
+	msg.sn_ = sn_;
+	msg.phase_ = phase_;
+
 	if (si != sign_) {
 		msg.result_ = error_wrong_sign;
 	}
 
 	if (count_ < 0) {
 		msg.result_ = error_invalid_data;
-	}
-
-	//12小时超时
-	if ((time(nullptr) - time_stamp_) > 12 * 3600 * 1000) {
-		msg.result_ = error_time_expired;
 	}
 
 	if (msg.result_ != error_success){
@@ -699,46 +699,72 @@ int msg_koko_trade_inout::handle_this()
 		return ret;
 	}
 	else {
-		extern safe_list<boost::shared_ptr<msg_koko_trade_inout>> glb_trades;
-		glb_trades.push_back(boost::dynamic_pointer_cast<msg_koko_trade_inout>(shared_from_this()));
+		auto it = glb_trades.find(sn_);
+		if (it == glb_trades.end()){
+			if (phase_ == phase_prepare){
+				boost::shared_ptr<trade_inout_orders> porder(new trade_inout_orders);
+				porder->msg = boost::dynamic_pointer_cast<msg_koko_trade_inout>(shared_from_this());
+				porder->phase_ = phase_;
+				porder->sn_ = sn_;
+				glb_trades[sn_] = porder;
+				int dir = dir_ & 0xFFFF;
+				if (dir == 0 ||dir == 1){
+					do_trade();
+				}
+				//如果是兑入平台,则暂时记录要兑入的钱
+				else {
+					porder->trade_state_ = 1;
+					porder->value_ = count_;
+					msg.result_ = error_success;
+					msg.count_ = count_;
+					send_protocol(from_sock_, msg);
+				}
+			}
+			else {
+				msg.result_ = error_invalid_data;
+				send_protocol(from_sock_, msg);
+			}
+		}
+		else {
+			it->second->phase_ = phase_;
+
+			msg_koko_trade_inout_ret msg;
+			msg.count_ = 0;
+			msg.result_ = error_success;
+			msg.sn_ = sn_;
+			msg.phase_ = phase_;
+
+			if (it->second->phase_ == phase_docommit){
+				it->second->commit();
+				int dir = it->second->msg->dir_ & 0xFFFF;
+				if (dir != 2){
+					send_protocol(from_sock_, msg);
+				}
+			}
+			else {
+				send_protocol(from_sock_, msg);
+			}
+		}
 		return error_success;
 	}
 }
 
-void msg_koko_trade_inout::handle_this2()
-{
-	static std::map<std::string, __int64> handled_trade;
+void update_user_item_async(std::string reason,
+	std::string sn,
+	std::string uid, int op,
+	int itemid, __int64 count, std::function<void(int, __int64)> cb,
+	std::vector<std::string> sync_to_server);
 
-	msg_koko_trade_inout_ret msg;
-	msg.count_ = 0;
-	msg.result_ = 0;
-	msg.sn_ = sn_;
-
-	auto it = handled_trade.find(sn_);
-	//如果订单处理过
-	if (it != handled_trade.end()) {
-		//如果状态未确定,则查询数据库状态
-		__int64 state = it->second;
-		if (state < 0) {
-			do_trade(&msg, handled_trade);
-		}
-		else {
-			msg.result_ = error_business_handled;
-			msg.count_ = state;
-		}
-		send_protocol(from_sock_, msg);
-	}
-	else {
-		handled_trade.insert(std::make_pair(sn_, -1));
-		do_trade(&msg, handled_trade);
-	}
-}
-
-void msg_koko_trade_inout::do_trade(msg_koko_trade_inout_ret* pmsg, std::map<std::string, __int64>& handled_trade)
+void msg_koko_trade_inout::do_trade()
 {
 	int ret = error_success;
 
-	__int64 retv = 0;
+	boost::shared_ptr<msg_koko_trade_inout_ret> pmsg(new msg_koko_trade_inout_ret());
+	pmsg->count_ = 0;
+	pmsg->result_ = 0;
+	pmsg->phase_ = phase_;
+	pmsg->sn_ = sn_;
+
 	int cid = dir_ >> 16;
 	if (cid == 0) {
 		cid = item_id_gold_game;
@@ -747,90 +773,83 @@ void msg_koko_trade_inout::do_trade(msg_koko_trade_inout_ret* pmsg, std::map<std
 		cid = item_id_gold;
 	}
 
-	dir_ = dir_ & 0xFFFF;
+	int dir = dir_ & 0xFFFF;
+	dir_ = dir;
+	__int64 cnt = count_;
+
+	auto psock = from_sock_;
+
+	auto fn = [psock, pmsg, dir, cnt](int ret, __int64 result) {
+		auto it = glb_trades.find(pmsg->sn_);
+		if (it == glb_trades.end()){
+			return;
+		}
+
+		boost::shared_ptr<trade_inout_orders> ptrade = it->second;
+		ptrade->trade_state_ = 1;
+		ptrade->tc_.restart();
+		if (ret == error_success) {
+			if (dir == 1){
+				ptrade->value_ = result;
+			}
+			else if(dir == 0)
+				ptrade->value_ = cnt;
+
+			if (result < 0) {
+				pmsg->result_ = error_invalid_request;
+			}
+			else {
+				pmsg->result_ = error_success;
+				pmsg->count_ = result;
+			}
+
+		}
+		else {
+			glb_trades.erase(it);
+			pmsg->result_ = ret;
+		}
+
+		//消息发送失败
+		int send_succ = send_json(psock, *pmsg, false, true);
+		if (send_succ != error_success && ret == error_success){
+			ptrade->rollback();
+		}
+	};
+
 	//从平台兑入游戏部分
 	if (dir_ == 0) {
-		//op = 0 add,  1 cost, 2 cost all
-		__int64 r = 0;
-		ret = update_user_item(game_name_ + ":兑入游戏-部分",
+		update_user_item_async(game_name_ + ":兑入游戏-部分",
 			std::string(sn_),
 			uid_, item_operator_cost,
-			cid, count_, retv,
+			cid, count_, fn,
 			all_channel_servers());
 
-		if (ret == error_success) {
-			update_user_item(game_name_ + ":兑入游戏-部分",
-				std::string(sn_),
-				uid_, item_operator_add, item_id_gold_game_lock,
-				retv, r, std::vector<std::string>());
-		}
 	}
 	//兑入所有
 	else if (dir_ == 1) {
-		__int64 r1 = 0, r2 = 0;
-		int ret1 = update_user_item(game_name_ + ":兑入游戏-所有", std::string(sn_),
-			uid_, item_operator_cost_all, cid, 0, r1, std::vector<std::string>());
-		ret = ret1;
-		if ((r1 + r2 > 0) && cid == item_id_gold_game) {
-			__int64 r = 0;
-			update_user_item(game_name_ + ":自动兑入游戏-所有", std::string(sn_),
-				uid_, 0, item_id_gold_game_lock, r1 + r2, r, std::vector<std::string>());
-		}
-		retv = r1 + r2;
-
-		if (cid == item_id_gold_game) {
-			sync_user_item(uid_, cid);
-		}
+		update_user_item_async(game_name_ + ":兑入游戏-所有",
+			std::string(sn_),
+			uid_, item_operator_cost_all,
+			cid, 0, fn,
+			std::vector<std::string>());
 	}
 	//从游戏兑入平台
 	else {
 		if (cid == item_id_gold_game) {
-			ret = update_user_item(game_name_ + ":自动兑回平台", std::string(sn_),
-				uid_, item_operator_add, cid, count_, retv, std::vector<std::string>());
-
-			sync_user_item(uid_, cid);
+			update_user_item_async(game_name_ + ":自动兑回平台",
+				std::string(sn_),
+				uid_, item_operator_add,
+				cid, count_, fn,
+				std::vector<std::string>());
 		}
 		else {
-			ret = update_user_item(game_name_ + ":自动兑回平台", std::string(sn_),
-				uid_, item_operator_add, cid, count_, retv, all_channel_servers());
-		}
-		if (ret == error_success && cid == item_id_gold_game) {
-			//平台还回来钱,锁定的钱就还原了.
-			__int64 r = 0;
-			update_user_item(game_name_ + ":自动兑回平台", std::string(sn_),
-				uid_, item_operator_cost_all, item_id_gold_game_lock, 0, r, std::vector<std::string>());
+			update_user_item_async(game_name_ + ":自动兑回平台", 
+				std::string(sn_),
+				uid_, item_operator_add, 
+				cid, count_, fn,
+				all_channel_servers());
 		}
 	}
-
-	if (ret == error_success) {
-		handled_trade[sn_] = retv;
-		if (retv < 0) {
-			pmsg->result_ = error_invalid_request;
-		}
-		else {
-			pmsg->result_ = error_success;
-			pmsg->count_ = retv;
-		}
-	}
-	else {
-		//不如不是状态未确定
-		if (ret != error_mysql_execute_uncertain && ret != -100) {
-			handled_trade[sn_] = 0;
-		}
-		pmsg->result_ = ret;
-	}
-
-	i_log_system::get_instance()->write_log(loglv_debug,
-		"msg_koko_trade_inout complete. [gameins = %s] dir = %d, uid = %s, sn = %s, count = %lld, retcode = %d, count = %lld",
-		from_sock_->instance_.c_str(),
-		dir_,
-		uid_.c_str(),
-		sn_.c_str(),
-		count_,
-		pmsg->result_,
-		pmsg->count_);
-
-	send_protocol(from_sock_, *pmsg);
 }
 
 int msg_action_record::handle_this()
@@ -3370,7 +3389,7 @@ int msg_del_all_mail::handle_this()
 				EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
 			}
 
-			for (int i = 0; i < v.size(); i++)
+			for (int i = 0; i < (int)v.size(); i++)
 			{
 				msg_user_mail_op msg;
 				msg.op_type_ = msg_user_mail_op::MAIL_OP_DEL;
@@ -3406,7 +3425,7 @@ int msg_del_all_mail::handle_this()
 					EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
 				}
 
-				for (int i = 0; i < v.size(); i++)
+				for (int i = 0; i < (int)v.size(); i++)
 				{
 					msg_user_mail_op msg;
 					msg.op_type_ = msg_user_mail_op::MAIL_OP_DEL;
@@ -3484,7 +3503,7 @@ int msg_get_mail_attach::handle_this()
 				reason = "礼物邮件";
 			}
 
-			for (int i = 0; i < vprize.size(); i += 2)
+			for (int i = 0; i < (int)vprize.size(); i += 2)
 			{
 				//普通物品
 				if (vprize[i] >= 0 && vprize[i + 1] > 0) {
@@ -3839,6 +3858,54 @@ int msg_get_head_list::handle_this()
 	});
 	
 	return error_success;
+}
+void	trade_inout_orders::commit()
+{
+	trade_state_ = 2;
+
+	int dir = msg->dir_ & 0xFFFF;
+	if (dir == 2)	{
+		msg->do_trade();
+	}
+}
+void trade_inout_orders::do_rollback()
+{
+	int cid = msg->dir_ >> 16;
+	if (cid == 0) {
+		cid = item_id_gold_game;
+	}
+	else if (cid == 1) {
+		cid = item_id_gold;
+	}
+
+	int dir = msg->dir_ & 0xFFFF;
+	__int64 outc = 0;
+	int ret = error_success;
+	//兑入部分
+	if (dir == 0){
+		ret = update_user_item("兑换失败,回退", get_guid(), msg->uid_, item_operator_add, cid, value_, outc, all_channel_servers());
+	}
+	//兑入游戏所有
+	else if (dir == 1){
+		ret = update_user_item("兑换失败,回退", get_guid(), msg->uid_, item_operator_add, cid, value_, outc, all_channel_servers());
+	}
+	else {
+		return;
+	}
+
+	if (ret == error_success){
+		i_log_system::get_instance()->write_log(loglv_info,
+			"trade rollback succ:sn=%s, uid = %s, value = %lld",
+			msg->sn_.c_str(), msg->uid_.c_str(),
+			value_);
+	}
+	else {
+		i_log_system::get_instance()->write_log(loglv_info,
+			"trade rollback failed:sn=%s, uid = %s, value = %lld",
+			msg->sn_.c_str(), msg->uid_.c_str(),
+			value_);
+	}
+	value_ = 0;
 }
 
 int msg_request_client_item::handle_this()

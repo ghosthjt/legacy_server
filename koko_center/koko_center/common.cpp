@@ -169,6 +169,91 @@ int			sync_user_item(std::string uid, int itemid)
 	return error_success;
 }
 
+
+std::string build_sql(std::string sn,
+	std::string uid, int op,
+	int itemid, __int64 count)
+{
+	std::string sql;
+	if (itemid == item_id_gold) {
+		sql += " call update_gold('" + sn + "','" + uid + "',"
+			+ boost::lexical_cast<std::string>(op) + ","
+			+ boost::lexical_cast<std::string>(0) + ","
+			+ boost::lexical_cast<std::string>(count) + ", @ret);";
+		sql += "select @ret;";
+	}
+	else if (itemid == item_id_gold_game) {
+		sql += " call update_gold('" + sn + "','" + uid + "',"
+			+ boost::lexical_cast<std::string>(op) + ","
+			+ boost::lexical_cast<std::string>(1) + ","
+			+ boost::lexical_cast<std::string>(count) + ", @ret);";
+		sql += "select @ret; ";
+	}
+	else if (itemid == item_id_gold_free) {
+		sql += " call update_gold('" + sn + "','" + uid + "',"
+			+ boost::lexical_cast<std::string>(op) + ","
+			+ boost::lexical_cast<std::string>(2) + ","
+			+ boost::lexical_cast<std::string>(count) + ", @ret);";
+		sql += "select @ret; ";
+	}
+	else if (itemid == item_id_gold_bank) {
+		sql += " call update_gold('" + sn + "','" + uid + "',"
+			+ boost::lexical_cast<std::string>(op) + ","
+			+ boost::lexical_cast<std::string>(4) + ","
+			+ boost::lexical_cast<std::string>(count) + ", @ret);";
+		sql += "select @ret; ";
+	}
+	else if (itemid == item_id_gold_game_bank) {
+		sql += " call update_gold('" + sn + "','" + uid + "',"
+			+ boost::lexical_cast<std::string>(op) + ","
+			+ boost::lexical_cast<std::string>(5) + ","
+			+ boost::lexical_cast<std::string>(count) + ", @ret);";
+		sql += "select @ret; ";
+	}
+	else {
+		sql = " call update_user_item('" + sn + "','" + uid + "',"
+			+ boost::lexical_cast<std::string>(op) + ","
+			+ boost::lexical_cast<std::string>(count) + ","
+			+ boost::lexical_cast<std::string>(itemid) + ",@ret);";
+		sql += "select @ret;  ";
+	}
+	return sql;
+}
+
+void save_item_update_result(std::string uid, int op, int itemid,
+	std::vector<std::string> sync_to_server, __int64 ret,
+	std::string reason, __int64 count)
+{
+	reason = ::utf8(reason);
+	{
+		BEGIN_REPLACE_TABLE("user_item_changes");
+		SET_FIELD_VALUE("uid", uid);
+		SET_FIELD_VALUE("for_server", "center");
+		SET_FINAL_VALUE("itemid", itemid);
+		EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
+	}
+	for (unsigned i = 0; i < sync_to_server.size(); i++)
+	{
+		BEGIN_REPLACE_TABLE("user_item_changes");
+		SET_FIELD_VALUE("uid", uid);
+		SET_FIELD_VALUE("for_server", sync_to_server[i]);
+		SET_FINAL_VALUE("itemid", itemid);
+		EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
+	}
+
+	//扣全部钱时没有钱,则不记录.
+	if (!(op == 2 && ret == 0)) {
+		BEGIN_REPLACE_TABLE("log_player_gold_changes");
+		SET_FIELD_VALUE("uid", uid);
+		SET_FIELD_VALUE("op", op);
+		SET_FIELD_VALUE("cid", itemid);
+		SET_FIELD_VALUE("count", count);
+		SET_FIELD_VALUE("reason", reason);
+		SET_FINAL_VALUE("oret", ret);
+		EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
+	}
+}
+
 //op = 0 add,  1 cost, 2 cost all
 //return -1 count < 0 ，-2 数值太大
 int			update_user_item(std::string reason,
@@ -177,134 +262,61 @@ int			update_user_item(std::string reason,
 	int itemid, __int64 count, __int64& ret,
 	std::vector<std::string> sync_to_server)
 {
-	std::string sql;
-	reason = ::utf8(reason);
-	if (itemid == item_id_gold){
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(0) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret;";
-	}
-	else if (itemid == item_id_gold_game){
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(1) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_free){
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(2) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_bank){
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(4) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_game_bank){
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(5) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_game_lock){
-		ret = count;
-		BEGIN_UPDATE_TABLE("user_account");
-		if (op == 0){
-			SET_FINAL_VALUE("gold_game_lock", count);
-		}
-		else if (op == 2 || op == 1){
-			SET_FINAL_VALUE("gold_game_lock", 0);
-		}
-		WITH_END_CONDITION("where uid = '" + uid + "'");
-		sql = str_field;
-	}
-	else{
-		sql = " call update_user_item('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(count) + ","
-			+ boost::lexical_cast<std::string>(itemid) + ",@ret);";
-		sql += "select @ret;  ";
-	}
-
+	std::string sql = build_sql(sn, uid, op, itemid, count);
 	Query q(*db_);
-	if (itemid == item_id_gold_game_lock){
-		if (q.execute(sql)){
-			for (unsigned i = 0; i < sync_to_server.size(); i++)
-			{
-				BEGIN_REPLACE_TABLE("user_item_changes");
-				SET_FIELD_VALUE("uid", uid);
-				SET_FIELD_VALUE("for_server", sync_to_server[i]);
-				SET_FINAL_VALUE("itemid", itemid);
-				EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
-			}
-			return error_success;
-		}
-		else{
-			return error_sql_execute_error;
-		}
-	}
-	else {
-		if (q.get_result(sql)){
-			if (q.fetch_row()){
-				ret = q.getbigint();
-				if (ret >= 0){
-					{
-						BEGIN_REPLACE_TABLE("user_item_changes");
-						SET_FIELD_VALUE("uid", uid);
-						SET_FIELD_VALUE("for_server", "center");
-						SET_FINAL_VALUE("itemid", itemid);
-						EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
-					}
-					for (unsigned i = 0; i < sync_to_server.size(); i++)
-					{
-						BEGIN_REPLACE_TABLE("user_item_changes");
-						SET_FIELD_VALUE("uid", uid);
-						SET_FIELD_VALUE("for_server", sync_to_server[i]);
-						SET_FINAL_VALUE("itemid", itemid);
-						EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
-					}
 
-					q.free_result();
-
-					//扣全部钱时没有钱,则不记录.
-					if (!(op == 2 && ret == 0)){
-						BEGIN_REPLACE_TABLE("log_player_gold_changes");
-						SET_FIELD_VALUE("uid", uid);
-						SET_FIELD_VALUE("op", op);
-						SET_FIELD_VALUE("cid", itemid);
-						SET_FIELD_VALUE("count", count);
-						SET_FIELD_VALUE("reason", reason);
-						SET_FINAL_VALUE("oret", ret);
-						EXECUTE_NOREPLACE_DELAYED("", get_delaydb());
-					}
-					return error_success;
-				}
-				else{
-					q.free_result();
-					return (int)ret;
-				}
-			}
-			else{
+	if (q.get_result(sql)){
+		if (q.fetch_row()){
+			ret = q.getbigint();
+			if (ret >= 0){
+				save_item_update_result(uid, op, itemid, sync_to_server, ret, reason, count);
+				q.free_result();
 				return error_success;
 			}
+			else{
+				q.free_result();
+				return (int)ret;
+			}
 		}
 		else{
-			//执行超时了,状态未确定
-			if (q.GetErrno() == 2013)	{
-				return error_mysql_execute_uncertain;
-			}
-			else
-				return error_sql_execute_error;
+			return error_success;
 		}
 	}
+	else{
+		return error_sql_execute_error;
+	}
+}
+
+void update_user_item_async(std::string reason,
+	std::string sn,
+	std::string uid, int op,
+	int itemid, __int64 count, std::function<void(int, __int64)> cb,
+	std::vector<std::string> sync_to_server)
+{
+	std::string sql = build_sql(sn, uid, op, itemid, count);
+
+	auto fn = [uid, op, itemid, sync_to_server, cb, reason, count]
+	(bool result, const std::vector<result_set_ptr> &vresult) {
+		if (!result || vresult.empty()) {
+			cb(-1, 0);
+		}
+		query_result_reader q(vresult[0]);
+		if (q.fetch_row()) {
+			__int64 ret = q.getbigint();
+			if (ret >= 0) {
+				cb(0, ret);
+				save_item_update_result(uid, op, itemid, sync_to_server, ret, reason, count);
+			}
+			else {
+				cb(ret, 0);
+			}
+		}
+		else {
+			cb(0, 0);
+		}
+	};
+
+	db_delay_helper_.get_result(sql, fn);
 }
 
 int			cost_gold(std::string reason, std::string uid, __int64 count, std::vector<std::string> sync)

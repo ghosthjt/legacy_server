@@ -11,7 +11,7 @@
 	<token_verify_key_>{327BE8D2-4A23-428F-B006-5A755288D5AB}</token_verify_key_>
 	<public_srvid_>{0E5CF63D-6F5C-45B7-B345-44FC06E58130}</public_srvid_>
 	<public_ip_>192.168.1.238</public_ip_>
-	<server_tag_>hongjt</server_tag_>
+	<server_tag_>hongjt_local</server_tag_>
 	<for_device_>PC,ANDROID,IOS</for_device_>
 	<for_games>all</for_games> <!--gameid用逗号分隔，或者是all,区分大小写,表示所有游戏都支持-->
 </config>

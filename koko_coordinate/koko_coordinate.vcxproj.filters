@@ -26,9 +26,6 @@
     <ClInclude Include="game_srv_socket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\koko_center\error.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\koko_center\koko_center\koko_socket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -36,9 +33,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\mysqlwrapped\enum_t.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\mysqlwrapped\IError.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\mysqlwrapped\set_t.h">
