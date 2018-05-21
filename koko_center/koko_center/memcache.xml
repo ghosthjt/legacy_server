@@ -9,7 +9,7 @@
 	<signkey_>{51B539D8-0D9A-4E35-940E-22C6EBFA86A8}</signkey_>
 	<token_verify_key_>{327BE8D2-4A23-428F-B006-5A755288D5AB}</token_verify_key_>
 	<token_generate_key_>{327BE8D2-4A23-428F-B006-5A755288D5AB}</token_generate_key_>
-	<shortmsg_host_>192.168.1.238</shortmsg_host_>
-	<shortmsg_port_>8080</shortmsg_port_>
+	<shortmsg_host_>192.168.1.210</shortmsg_host_>
+	<shortmsg_port_>8081</shortmsg_port_>
 	<server_tag_>hongjt_local</server_tag_>
 </config>

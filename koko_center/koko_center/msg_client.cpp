@@ -60,7 +60,7 @@ int msg_user_login::handle_this()
 int msg_user_register::handle_this()
 {
 	if(from_sock_->is_register_.load())
-		return error_success;
+		return error_server_busy;
 
 	if (sub_thread_process_msg_lst_.size() > 100){
 		return error_server_busy;
@@ -71,7 +71,7 @@ int msg_user_register::handle_this()
 	std::string rsign;
 	rsign.insert(rsign.end(), sign_, sign_ + 32);
 	if (sign != rsign){
-		return error_server_busy;
+		return error_wrong_sign;
 	}
 
 	sub_thread_process_msg_lst_.push_back(

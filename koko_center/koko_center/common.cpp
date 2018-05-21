@@ -169,54 +169,15 @@ int			sync_user_item(std::string uid, int itemid)
 	return error_success;
 }
 
-
 std::string build_sql(std::string sn,
 	std::string uid, int op,
 	int itemid, __int64 count)
 {
-	std::string sql;
-	if (itemid == item_id_gold) {
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(0) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret;";
-	}
-	else if (itemid == item_id_gold_game) {
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(1) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_free) {
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(2) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_bank) {
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(4) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else if (itemid == item_id_gold_game_bank) {
-		sql += " call update_gold('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(5) + ","
-			+ boost::lexical_cast<std::string>(count) + ", @ret);";
-		sql += "select @ret; ";
-	}
-	else {
-		sql = " call update_user_item('" + sn + "','" + uid + "',"
-			+ boost::lexical_cast<std::string>(op) + ","
-			+ boost::lexical_cast<std::string>(count) + ","
-			+ boost::lexical_cast<std::string>(itemid) + ",@ret);";
-		sql += "select @ret;  ";
-	}
+	std::string sql = " call update_user_item('" + sn + "','" + uid + "',"
+		+ boost::lexical_cast<std::string>(op) + ","
+		+ boost::lexical_cast<std::string>(count) + ","
+		+ boost::lexical_cast<std::string>(itemid) + ",@ret);";
+	sql += "select @ret;  ";
 	return sql;
 }
 
@@ -300,19 +261,21 @@ void update_user_item_async(std::string reason,
 		if (!result || vresult.empty()) {
 			cb(-1, 0);
 		}
-		query_result_reader q(vresult[0]);
-		if (q.fetch_row()) {
-			__int64 ret = q.getbigint();
-			if (ret >= 0) {
-				cb(0, ret);
-				save_item_update_result(uid, op, itemid, sync_to_server, ret, reason, count);
+		else {
+			query_result_reader q(vresult[0]);
+			if (q.fetch_row()) {
+				__int64 ret = q.getbigint();
+				if (ret >= 0) {
+					cb(0, ret);
+					save_item_update_result(uid, op, itemid, sync_to_server, ret, reason, count);
+				}
+				else {
+					cb(ret, 0);
+				}
 			}
 			else {
-				cb(ret, 0);
+				cb(0, 0);
 			}
-		}
-		else {
-			cb(0, 0);
 		}
 	};
 

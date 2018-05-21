@@ -37,15 +37,22 @@
 #include "i_log_system.cpp"
 #include "file_system.cpp"
 #include "net_socket_basic.cpp"
-
+#include "net_socket_remote.cpp"
 
 #pragma auto_inline (off)
 #pragma comment(lib, "dbghelp.lib")
 
 extern std::string	md5_hash(std::string sign_pat);
-class koko_net_server : public net_server<koko_socket>
+
+remote_socket_ptr socket_cr(net_server& srv)
+{
+	return boost::make_shared<koko_socket>(srv);
+}
+
+class koko_net_server : public net_server
 {
 public:
+	koko_net_server() :net_server(socket_cr) {}
 	bool on_connection_accepted(remote_socket_ptr remote)
 	{
 		i_log_system::get_instance()->write_log(loglv_info, "connection accept, ip:%s", remote->remote_ip().c_str());
@@ -295,7 +302,7 @@ void	pickup_player_msgs(bool& busy)
 	auto  remotes = the_net->get_remotes();
 	for (unsigned int i = 0 ;i < remotes.size(); i++)
 	{
-		koko_socket_ptr psock = remotes[i];
+		koko_socket_ptr psock = boost::dynamic_pointer_cast<koko_socket>(remotes[i]);
 		bool got_msg = false;
 
 		unsigned int pick_count = 0;
@@ -592,7 +599,7 @@ int		handle_user_register(msg_user_register* pregister)
 			}
 		}
 		else if(pregister->type_ == 0){
-			boost::regex expr("^[a-zA-Z0-9]{3,}$");
+			boost::regex expr("^[a-zA-Z0-9_]{3,}$");
 			bool matched = boost::regex_match(number.c_str(), what, expr);
 			if (!matched){
 				return error_invalid_data;
@@ -606,15 +613,7 @@ int		handle_user_register(msg_user_register* pregister)
 		}
 	}
 
-	//用户名或邮箱注册，对应验证码
-	if (pregister->type_ == 0){
-		extern int func_check_verify_code(std::string vcode, koko_socket_ptr fromsock, bool is_check);
-		int ret =  func_check_verify_code(pregister->verify_code, pregister->from_sock_, false);
-		if (ret != error_success){
-			return ret;
-		}
-	} 
-	else if (pregister->type_ == 1){
+	if (pregister->type_ == 1){
 		int ret = error_success;
 		if (pregister->from_sock_ ->mverify_code_ == ""){
 			ret = error_wrong_verify_code;
@@ -804,7 +803,7 @@ int load_user_from_db(msg_user_login_t<remote_t>* plogin, player_ptr& pp, bool c
 
 	std::vector<char> headpic;
 
-	if (md5_hash(pwd) != plogin->pwd_hash_){
+	if (pwd != plogin->pwd_hash_){
 		return error_wrong_password;
 	}
 
@@ -1086,7 +1085,7 @@ int			do_load_user(std::string sql, player_ptr& pp, bool check_psw, std::string 
 	std::vector<char> headpic;
 	q.getblob("headpic", headpic);
 
-	if (check_psw && md5_hash(pwd) != pwd_check) {
+	if (check_psw && pwd != pwd_check) {
 		return error_wrong_password;
 	}
 
@@ -1300,6 +1299,9 @@ int	handle_pending_logins()
 			msg_same_account_login msg;
 			auto conn = itp->second->from_socket_.lock();
 			if (conn == pp->from_socket_.lock()){
+				conn->is_login_ = false;
+				msg_user_login_ret msg;
+				response_user_login(pp, conn, msg);
 				return error_success;
 			}
 			if(conn.get())
