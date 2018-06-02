@@ -192,7 +192,7 @@ void	response_user_login(player_ptr pp, remote_t pconn, msg_user_login_ret& msg)
 	msg.vip_level_ = pp->vip_level();
 	msg.sequence_ = pp->seq_;
 	msg.idcard_ = pp->idnumber_;
-
+	msg.headico_ = pp->headpic_;
 	msg.phone = pp->mobile_;
 	msg.phone_verified_ = pp->mobile_v_;
 
@@ -574,10 +574,10 @@ int		handle_user_register(msg_user_register* pregister)
 	if (q.get_result(sql) && q.fetch_row() && !iswhite){
 		int c  = q.getval();
 		__int64 tmst = q.getbigint();
-		//1小时只能注册一个号,一个机器最多只能注册5个号.
-		if (c > 10 || (::time(nullptr) - tmst) < 3600){
-			return error_cannt_regist_more;
-		}
+// 		//1小时只能注册一个号,一个机器最多只能注册5个号.
+// 		if (c > 10 || (::time(nullptr) - tmst) < 3600){
+// 			return error_cannt_regist_more;
+// 		}
 	}
 	q.free_result();
 
@@ -655,7 +655,7 @@ int		handle_user_register(msg_user_register* pregister)
 	}
 	q.free_result();
 
-	update_user_item("注册赠送", "localcall", uid, item_operator_add, item_id_gold, c, outc, std::vector<std::string>());
+	update_user_item("注册赠送", "localcall", uid, item_operator_add, item_id_gold_game, 1000000, outc, std::vector<std::string>());
 
 	msg_common_reply<koko_socket_ptr> msg;
 	msg.rp_cmd_ = GET_CLSID(msg_user_register);
@@ -753,7 +753,7 @@ int load_user_from_db(msg_user_login_t<remote_t>* plogin, player_ptr& pp, bool c
 	int len =	mysql_real_escape_string(&db_->grabdb()->mysql,saccname, plogin->acc_name_.c_str(), strlen(plogin->acc_name_.c_str()));
 	Database& db = *db_;
 	Query q(db);
-	std::string sql = "select uid, pwd, nickname, iid, gold, gold_game, gold_free, vip_value, vip_limit,"
+	std::string sql = "select uid, pwd, nickname, headpic_name, iid, gold, gold_game, gold_free, vip_value, vip_limit,"
 		" idnumber, mobile_number, mobile_verified, mail, mail_verified, level, addr_province, addr_city, addr_region,"
 		" gender, byear, bmonth, bday, address, age, is_agent,"
 		" unix_timestamp(create_time), sec_mobile, machine_mark, partyName from user_account where uname = '" + std::string(saccname) + "'"
@@ -770,6 +770,7 @@ int load_user_from_db(msg_user_login_t<remote_t>* plogin, player_ptr& pp, bool c
 	std::string uid = q.getstr();
 	std::string	pwd = q.getstr();
 	std::string nickname = q.getstr();
+	std::string headico = q.getstr();
 	__int64 iid = q.getbigint();
 	__int64 gold = q.getbigint();
 	__int64 gold_game = q.getbigint();
@@ -800,8 +801,6 @@ int load_user_from_db(msg_user_login_t<remote_t>* plogin, player_ptr& pp, bool c
 	}
 	std::string macmark = q.getstr();
 	std::string party_name = q.getstr();
-
-	std::vector<char> headpic;
 
 	if (pwd != plogin->pwd_hash_){
 		return error_wrong_password;
@@ -837,7 +836,7 @@ int load_user_from_db(msg_user_login_t<remote_t>* plogin, player_ptr& pp, bool c
 	pp->is_connection_lost_ = 0;
 	pp->iid_ = iid;
 	pp->nickname_ = nickname;
-	pp->headpic_ = headpic;
+	pp->headpic_ = headico;
 	pp->gold_ = gold;
 	pp->vip_value_ = vip_value;
 	pp->vip_limit_ = vip_limit;
@@ -1081,10 +1080,8 @@ int			do_load_user(std::string sql, player_ptr& pp, bool check_psw, std::string 
 	int age = q.getval();
 	int isagent = q.getval();
 	__int64	create_tm = q.getval();
-
-	std::vector<char> headpic;
-	q.getblob("headpic", headpic);
-
+	std::string headpic = q.getstr();
+	
 	if (check_psw && pwd != pwd_check) {
 		return error_wrong_password;
 	}
@@ -1137,7 +1134,7 @@ int load_user_by_uid(std::string uid, player_ptr& pp, bool check_sign)
 	std::string sql = "select uid, pwd, nickname, iid, gold, gold_game, gold_free, vip_value, vip_limit,"
 		" idnumber, mobile_number, mobile_verified, mail, mail_verified, level, addr_province, addr_city, addr_region,"
 		" gender, byear, bmonth, bday, address, age, is_agent, "
-		" unix_timestamp(create_time), headpic from user_account where uid = '" + std::string(uid) + "'";
+		" unix_timestamp(create_time), headpic_name from user_account where uid = '" + std::string(uid) + "'";
 
 	return do_load_user(sql, pp, false, "");
 }
@@ -1319,9 +1316,6 @@ int	handle_pending_logins()
 			msg_user_login_ret msg;
 			response_user_login(pp, pconn, msg);
 
-			msg_user_image msg_headpic;
-			msg_headpic.uid_ = pp->uid_;
-			send_image(msg_headpic, pp->headpic_, pconn);
 			extern void	send_all_items_to_player(std::string uid, boost::shared_ptr<koko_socket> psock);
 			send_all_items_to_player(pp->uid_, pconn);
 		}

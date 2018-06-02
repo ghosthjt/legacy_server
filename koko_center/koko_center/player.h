@@ -15,9 +15,8 @@ public:
 	int					vip_limit_;
 	__int64				gold_, gold_game_, gold_free_;
 	__int64				iid_;
-	std::string			head_ico_;
 	int					headframe_id_;
-	std::vector<char>	headpic_;
+	std::string			headpic_;
 	std::string			nickname_;
 	std::string			token_;
 	__int64				seq_;

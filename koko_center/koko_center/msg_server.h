@@ -87,7 +87,7 @@ public:
 	std::string		idcard_;				//…Ì∑›÷§∫≈
 	std::string		app_key_;
 	std::string		party_name_;
-	
+	std::string		headico_;
 	msg_user_login_ret()
 	{
 		head_.cmd_ = GET_CLSID(msg_user_login_ret);
@@ -115,6 +115,7 @@ public:
 		write_jvalue(idcard_, data_s);
 		write_jvalue(app_key_, data_s);
 		write_jvalue(party_name_, data_s);
+		write_jvalue(headico_, data_s);
 		return 0;
 	}
 };

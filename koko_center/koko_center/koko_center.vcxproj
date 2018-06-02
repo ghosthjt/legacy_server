@@ -37,6 +37,9 @@
     <ClCompile Include="msg_client.cpp" />
     <ClCompile Include="player.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\koko_center.sln" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2A69C1E8-C4D8-4447-9965-3F220642899A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
